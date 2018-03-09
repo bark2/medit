@@ -48,10 +48,9 @@ public:
     // Pre-compiles a list of characters from the given font
     void Load(std::string font, GLuint fontSize);
     // Renders a string of text using the precompiled list of characters
-    template <typename Functor>
-    void RenderText(std::list<Piece>::const_iterator cbegin,
-		    std::list<Piece>::const_iterator cend,
-		    Functor& next_writable,
+
+    void RenderText(std::list<GapBuffer>::iterator start_row,
+		    std::list<GapBuffer>::iterator end_row,
 		    GLfloat x,
 		    GLfloat y,
 		    GLfloat scale,
@@ -64,9 +63,9 @@ public:
 	glBindVertexArray(this->VAO);
 
 	GLfloat glyph_size = 20;
-	for (auto iter = cbegin; iter != cend; iter++) {
-	    char const* c;
-	    while ((c = next_writable(iter)) != NULL) {
+	for (auto cr = start_row; cr != end_row; cr++) {
+	    char const * c;
+	    while ((c = cr->nextChar()) != NULL) {
 		Character ch = Characters[*c];
 
 		GLfloat xpos = x + ch.Bearing.x * scale;

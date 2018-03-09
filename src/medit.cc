@@ -1,9 +1,6 @@
 #include <iostream>
 #include <cctype>
 
-#include <codecvt>
-#include <locale>
-#include <unistd.h>
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
 // GLM
@@ -23,18 +20,18 @@ const GLuint rows = HEIGHT/font_size;
 
 
 TextRenderer textRenderer;
-PieceTable piece_table;
+Buffer buffer;
 
 void key_callback(GLFWwindow* window, int key, int scancod, int action, int mods) {
     if (action == GLFW_PRESS || action == GLFW_REPEAT)
 	switch (key) {
 	case GLFW_KEY_ENTER:
-	    piece_table.insertPiece();
+	    buffer.insertLine();
 	case -1: // UNKOWN_KEY
 	    break;
 	case 'D':
 	    if (mods & GLFW_MOD_ALT) {
-		piece_table.backspace();
+		buffer.backspace();
 		break;
 	    }
 	case 'Q':
@@ -45,9 +42,9 @@ void key_callback(GLFWwindow* window, int key, int scancod, int action, int mods
 	default:
 	    if (key < 97) {
 		if (mods & GLFW_MOD_SHIFT)
-		    piece_table.insert(key);
+		    buffer.insert(key);
 		else
-		    piece_table.insert(tolower(key));
+		    buffer.insert(tolower(key));
 	    }
 	}
 }
@@ -90,15 +87,13 @@ int main()
 	// Check and call events
 	glfwWaitEvents();
 	// text rendering
-	PieceTable::NextWritable next_writable = PieceTable::NextWritable(piece_table.pieces.cbegin());
-	textRenderer.RenderText(piece_table.pieces.cbegin(),
-				piece_table.pieces.cend(),
-				next_writable,
+	//PieceTable::NextWritable next_writable = PieceTable::NextWritable(buffer.lines.cbegin());
+	textRenderer.RenderText(buffer.lines.begin(),
+				buffer.lines.end(),
 				0.0f,
 				0.0f,
 				1.0f,
 				glm::vec3(255.0f, 255.0f, 255.0f));
-	
 	// Swap the buffers
 	glfwSwapBuffers(window);
     }

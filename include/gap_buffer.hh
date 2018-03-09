@@ -8,43 +8,44 @@
 #include <utility>
 #include <list>
 
-struct GapBuffer {
-    static const unsigned int defaultBufSize = 16;
-    static const unsigned int defaultGapSize = 16;
+enum Style {
+    ST_NORMAL = 0,
+    ST_INVERT
+};
 
-    unsigned int size;
-    unsigned int gap_offset;
-    unsigned int gap_size;
-    unsigned int nchars;
+struct GapBuffer {
+    static const uint32_t defaultBufSize = 16;
+    static const uint32_t defaultGapSize = 16;
+
+    size_t size;
+    uint32_t gap_offset;
+    size_t gap_size;
+    uint32_t nchars;
+
+    std::unique_ptr<char[]> line;
+    std::unique_ptr<Style[]> styles;
+    uint32_t cursor_offset;
     
-    void moveGapTo(unsigned int offset);
+    void moveGapTo(uint32_t offset);
     void expand();
     void shrink();
 
-    struct Char {char c; Style style;};
-    std::unique_ptr<char[]> buf;
-    unsigned int cursor_offset;
-
-    GapBuffer(unsigned int bufSize=defaultBufSize, unsigned int gapSize=defaultGapSize);
-    GapBuffer(GapBuffer&& other) :
-	size(other.size), gap_offset(other.gap_offset), gap_size(other.gap_size), cursor_offset(other.cursor_offset), nchars(0) {
-	buf = std::move(other.buf);
-    }
+    GapBuffer(uint32_t bufSize=defaultBufSize, uint32_t gapSize=defaultGapSize);
+    GapBuffer(GapBuffer&& other);
     ~GapBuffer() = default;
     void putc(char c);
     void rem();
     void puts(const char* s, size_t size);    
     void puts(std::string s);    
-    void moveCursor(int offset);
-    void moveCursorTo(uint32_t offset);
+    void moveCursor(int32_t offset);
+    void moveCursorToDest(uint32_t dest);
+
+    uint32_t lchars;
+    uint32_t i;
+    const char* nextChar();
 };
 
-struct Piece {
-    GapBuffer gap_buffer;
-    // bool writeable;
-};
-
-struct PieceTable
+struct Buffer
 {
     // turning this into a clojure(well it is already is, mb lambda), to mark a region for a command, e.g cut,copy,render..
     // mark(start_line, end_line, start_char, end_char) --> struct {const char* s, size_t size}
@@ -55,37 +56,35 @@ struct PieceTable
     // thus we should use a new ds for characters: {char c, word_mode}, where word_mode specifies if the word is
     // a saved word, struct, class, type, variable_name ..
     // idie - collabration programming editor. how should we support that? P2P\clinet server? undo operation? real time?
-    int start_mark;
-    int end_mark;
-    struct NextWritable {
-	std::list<Piece>::const_iterator citer;
-	unsigned int cleft_chars;
-	unsigned int coffset;
-	NextWritable(const std::list<Piece>::const_iterator& iter) : citer(iter), coffset(0), cleft_chars(iter->gap_buffer.nchars) {};
-	const char* operator()(const std::list<Piece>::const_iterator& iter) {
-	    if (coffset == iter->gap_buffer.gap_offset)
-		coffset = iter->gap_buffer.gap_offset + iter->gap_buffer.gap_size;
-	    if (!cleft_chars || coffset == iter->gap_buffer.size) {
-		coffset = 0;
-		citer++;
-		cleft_chars = citer->gap_buffer.nchars;
-		return NULL;
-	    }
-	    const char* c = &iter->gap_buffer.buf[coffset];
-	    coffset++;
-	    return c;
-	}
-    };
-    
-    std::list<Piece> pieces;
-    std::list<Piece>::iterator citer;
 
-    PieceTable() : pieces() {
-	pieces.push_back(std::move(Piece()));
-	citer = pieces.begin();
+    // struct NextWritable {
+    // 	std::list<GapBuffer>::const_iterator crow;
+    // 	uint32_t cleft_chars;
+    // 	uint32_t coffset;
+    // 	NextWritable(const std::list<Buffer>::const_iterator& iter) : citer(iter), coffset(0), cleft_chars(iter->gap_buffer.nchars) {};
+    // 	const char* operator()(const std::list<Piece>::const_iterator& iter) {
+    // 	    if (coffset == iter->gap_buffer.gap_offset)
+    // 		coffset = iter->gap_buffer.gap_offset + iter->gap_buffer.gap_size;
+    // 	    if (!cleft_chars || coffset == iter->gap_buffer.size) {
+    // 		coffset = 0;
+    // 		citer++;
+    // 		cleft_chars = citer->gap_buffer.nchars;
+    // 		return NULL;
+    // 	    }
+    // 	    const char* c = &iter->gap_buffer.buf[coffset];
+    // 	    coffset++;
+    // 	    return c;
+    // 	}
+    // };
+    std::list<GapBuffer> lines;
+    std::list<GapBuffer>::iterator cline;
+
+    Buffer() : lines() {
+	lines.push_back(std::move(GapBuffer()));
+	cline = lines.begin();
     };
-    void insertPiece();
-    void combinePieces();
+    void insertLine();
+    void combineLines();
     void insert(char c);
     void backspace();
     void moveCursor(int offset);
