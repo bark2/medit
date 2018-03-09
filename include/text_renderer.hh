@@ -1,5 +1,3 @@
-
-
 /*******************************************************************
  ** This code is part of Breakout.
  **
@@ -49,8 +47,9 @@ public:
     void Load(std::string font, GLuint fontSize);
     // Renders a string of text using the precompiled list of characters
 
-    void RenderText(std::list<GapBuffer>::iterator start_row,
-		    std::list<GapBuffer>::iterator end_row,
+    void RenderText(std::list<Line>::iterator start_row,
+		    std::list<Line>::iterator end_row,
+		    coord cursor,
 		    GLfloat x,
 		    GLfloat y,
 		    GLfloat scale,
@@ -62,12 +61,17 @@ public:
 	glActiveTexture(GL_TEXTURE0);
 	glBindVertexArray(this->VAO);
 
-	GLfloat glyph_size = 20;
+	GLfloat glyph_size;
+	int row = 0;
 	for (auto cr = start_row; cr != end_row; cr++) {
-	    char const * c;
-	    while ((c = cr->nextChar()) != NULL) {
+	    int col = 0;
+	    char* c;
+	    Style* style;
+	    cr->init_iterating();
+	    while (cr->next_char(&c, &style)) {
 		Character ch = Characters[*c];
-
+		
+		glyph_size = ch.Size;
 		GLfloat xpos = x + ch.Bearing.x * scale;
 		GLfloat ypos = y + (this->Characters['H'].Bearing.y - ch.Bearing.y) * scale;
 
@@ -94,9 +98,11 @@ public:
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		// Now advance cursors for next glyph
 		x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (1/64th times 2^6 = 64)
+		col++;
 	    }
 	    x = 0;
 	    y += glyph_size;
+	    row++;
 	}
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);

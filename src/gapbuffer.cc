@@ -3,18 +3,15 @@
 
 void Buffer::insert(char c)
 {
-    cline->nchars++;
     cline->putc(c);
 }
 
 void Buffer::backspace()
 {
-    while (!cline->cursor_offset && cline != lines.begin())
+    if (!cline->cursor_offset && cline != lines.begin())
 	cline--;
-    if (!cline->cursor_offset && cline == lines.begin())
-	return;
-    cline->nchars--;
-    cline->rem();
+    else
+	cline->rem();
 }
 
 void Buffer::moveCursor(int offset) {
@@ -22,11 +19,11 @@ void Buffer::moveCursor(int offset) {
 }
 
 void Buffer::insertLine() {
-    GapBuffer& pline = *cline;
-    cline->moveGapTo(cline->cursor_offset);
+    Line& pline = *cline;
+    cline->moveGapToDest(cline->cursor_offset);
     
     cline++;
-    lines.insert(cline, std::move(GapBuffer()));
+    lines.insert(cline, std::move(Line()));
     cline--;
     if (pline.cursor_offset + pline.gap_size < pline.size &&
 	pline.line[pline.cursor_offset + pline.gap_size] != '\0') {
@@ -46,29 +43,45 @@ void Buffer::combineLines() {
     cline->puts(&cline->line[second_text_offset], second_text_size);
 }
 
-const char* GapBuffer::nextChar() {
+void Line::begin_iter() {
+    i = 0;
+    lchars = nchars;
+}
+
+bool Line::next_iter(char** c, Style** style)
+{
+    if (!nchars)
+	return false;
     if (i == gap_offset)
 	i += gap_size;
     if (!lchars || i == size) {
 	lchars = nchars;
 	i = 0;
-	return nullptr;
+	return false;
     }
-    nchars--;
+    lchars--;
+    *c = &line[i];
+    *style = &styles[i];
     i++;
-    return &line[i-1];
+    return true;
 }
 
-GapBuffer::GapBuffer(uint32_t lineSize, uint32_t gapSize)
-    : line(std::make_unique<char[]>(lineSize)), size(lineSize), cursor_offset(0), gap_size(gapSize), gap_offset(0), nchars(0), i(0)
+bool Line::prev_char()
+{
+    
+}
+
+Line::Line(uint32_t lineSize, uint32_t gapSize)
+    : line(std::make_unique<char[]>(lineSize)), styles(std::make_unique<Style[]>(lineSize)), size(lineSize), cursor_offset(0), gap_size(gapSize), gap_offset(0), nchars(0), i(0)
 {}
 
-GapBuffer::GapBuffer(GapBuffer&& other) :
+Line::Line(Line&& other) :
     size(other.size), gap_offset(other.gap_offset), gap_size(other.gap_size), cursor_offset(other.cursor_offset), nchars(0), i(0) {
     line = std::move(other.line);
+    styles = std::move(other.styles);
 }
 
-void GapBuffer::moveGapTo(uint32_t offset) {
+void Line::moveGapToDest(uint32_t offset) {
     int32_t delta = offset - gap_offset;
     if (delta < 0) {
 	std::memcpy(line.get() + offset + gap_size, line.get() + offset, -1 * delta);
@@ -79,7 +92,7 @@ void GapBuffer::moveGapTo(uint32_t offset) {
     }
 }
 
-void GapBuffer::expand() {
+void Line::expand() {
     uint32_t newLineSize = 2 * size;
     std::unique_ptr<char[]> newLine(new char[newLineSize]);
     std::memcpy(newLine.get(), line.get(), size);
@@ -89,52 +102,53 @@ void GapBuffer::expand() {
     size = newLineSize;
 }
 
-void GapBuffer::shrink()
+void Line::shrink()
 {
-    uint32_t newBufSize = size/2;
-    std::unique_ptr<char[]> newLine(new char[newBufSize]);
+    uint32_t newLineSize = size/2;
+    std::unique_ptr<char[]> newLine(new char[newLineSize]);
     std::memcpy(newLine.get(), line.get(), size);
     line = std::move(newLine);
-    size = newBufSize;
+    size = newLineSize;
 }
 
-void GapBuffer::moveCursor(int32_t offset) {
-    cursor_offset += offset;
+bool Line::moveCursor(int32_t offset) {
 }
 
-void GapBuffer::moveCursorToDest(uint32_t offset) {
+void Line::moveCursorToDest(uint32_t offset) {
     cursor_offset = offset;
 }
 
-void GapBuffer::putc(char c) {
+void Line::putc(char c) {
     if (!gap_size)
 	expand();
-    moveGapTo(cursor_offset);
+    moveGapToDest(cursor_offset);
     cursor_offset++;
     line[gap_offset++] = c;
     gap_size--;
+    nchars++;
 }
 
 // todo: add a shrink() posibilty
-void GapBuffer::rem() {
+void Line::rem() {
     // if (gap_size == (size+1)/2)
     // 	shrink();
-    moveGapTo(cursor_offset);
+    moveGapToDest(cursor_offset);
     line[cursor_offset] = '\0';
     if (!cursor_offset)
 	return;
     cursor_offset--;
     gap_offset--;
     gap_size++;
+    nchars--;
 }
 
-void GapBuffer::puts(const char* s, size_t size)
+void Line::puts(const char* s, size_t size)
 {
     for (int i = 0; i < size; i++)
 	putc(s[i]);
 }
 
-void GapBuffer::puts(std::string s)
+void Line::puts(std::string s)
 {
     for (char c : s)
 	putc(c);

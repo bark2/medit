@@ -13,7 +13,7 @@ enum Style {
     ST_INVERT
 };
 
-struct GapBuffer {
+struct Line {
     static const uint32_t defaultBufSize = 16;
     static const uint32_t defaultGapSize = 16;
 
@@ -26,13 +26,13 @@ struct GapBuffer {
     std::unique_ptr<Style[]> styles;
     uint32_t cursor_offset;
     
-    void moveGapTo(uint32_t offset);
+    void moveGapToDest(uint32_t offset);
     void expand();
     void shrink();
 
-    GapBuffer(uint32_t bufSize=defaultBufSize, uint32_t gapSize=defaultGapSize);
-    GapBuffer(GapBuffer&& other);
-    ~GapBuffer() = default;
+    Line(uint32_t bufSize=defaultBufSize, uint32_t gapSize=defaultGapSize);
+    Line(Line&& other);
+    ~Line() = default;
     void putc(char c);
     void rem();
     void puts(const char* s, size_t size);    
@@ -42,7 +42,8 @@ struct GapBuffer {
 
     uint32_t lchars;
     uint32_t i;
-    const char* nextChar();
+    void init_iterating();
+    bool next_char(char** c, Style** style);
 };
 
 struct Buffer
@@ -76,11 +77,11 @@ struct Buffer
     // 	    return c;
     // 	}
     // };
-    std::list<GapBuffer> lines;
-    std::list<GapBuffer>::iterator cline;
+    std::list<Line> lines;
+    std::list<Line>::iterator cline;
 
     Buffer() : lines() {
-	lines.push_back(std::move(GapBuffer()));
+	lines.push_back(std::move(Line()));
 	cline = lines.begin();
     };
     void insertLine();
