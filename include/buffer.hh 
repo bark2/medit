@@ -1,0 +1,31 @@
+#ifndef BUFFER_H
+#define BUFFER_H
+
+#include "line.hh"
+
+struct Buffer
+{
+    // mark(start_line, end_line, start_char, end_char) --> struct {const char* s, size_t size}
+    // marking shoudln't change the cursor position
+    // after ill use a rb_tree to search for a specific line index the search will be much faster..
+    // mb will use hash table with a linked list for O(1) search/insert/remove
+    // should use a rope to search for special words, influential in syntax highlighting(mb not because this should be used on really small files ..)
+    // thus we should use a new ds for characters: {char c, word_mode}, where word_mode specifies if the word is
+
+std::list<Line> lines;
+    std::list<Line>::iterator cline;
+
+    Buffer() : lines() {
+	lines.push_back(std::move(Line()));
+	cline = lines.begin();
+    };
+    void insert_line(Coord& cursor);
+    void insert(Coord& cursor, char c);
+    void backspace(Coord& cursor);
+    void move_cursor(Coord& cursor,int offset);
+    // thinking of implementing only the basic functuality here.
+    // a struct {cursor_pos, current_line, font_size, number_of_rows_on_screen, marked_initial_pos, mark_mode} should be saved on main
+    // RenderText would get the background glyph color as well when rendering in mark mode
+};
+
+#endif

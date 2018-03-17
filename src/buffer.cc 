@@ -1,0 +1,44 @@
+#include "buffer.cc"
+
+void Buffer::insert(Coord& cursor, char c)
+{
+    cline->putc(c);
+    cursor.x++;
+}
+
+void Buffer::backspace(Coord& cursor)
+{
+    if (!cline->rem()) {
+	if (cline == lines.cbegin()) {
+	    if (++cline != lines.cend()) {
+		lines.erase(--cline);
+	    } else {
+		return;
+	    }
+	}
+	std::list<Line>::iterator tmp = cline--;
+	combine_lines(*cline, *tmp);
+	lines.erase(tmp);
+	cursor.x = cline->nchars;
+	cursor.y--;
+    } else {
+	cursor.x--;
+    }
+}
+
+void Buffer::emplace_line(Coord& cursor) {
+    Line& pline = *cline;
+    cline->move_gap_to_dest(cline->cursor_offset);
+    
+    cline++;
+    lines.insert(cline, std::move(Line()));
+    cline--;
+    if (pline.cursor_offset + pline.gap_size < pline.size &&
+	pline.line[pline.cursor_offset + pline.gap_size] != '\0') {
+	int start_offset = pline.cursor_offset + pline.gap_size;
+	cline->puts(&pline.line[start_offset], start_offset - pline.size);
+    }
+    cursor.y++;
+}
+
+#endif

@@ -11,42 +11,68 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include "types.hh"
 #include "text_renderer.hh"
 #include "gap_buffer.hh"
+
 
 const GLuint WIDTH = 800, HEIGHT = 600;
 const GLuint font_size = 20;
 const GLuint rows = HEIGHT/font_size;
 
 
+
 TextRenderer textRenderer;
 Buffer buffer;
 
+Coord cursor {};
+
+enum Mode {
+    INSERT_MODE = 0,
+    COMMAND_MODE,
+    MARK_MODE
+};
+static Mode mode;
+
+// todo: later to a keymapping option, reading a config file mb
+// todo: read more about openGL
 void key_callback(GLFWwindow* window, int key, int scancod, int action, int mods) {
-    if (action == GLFW_PRESS || action == GLFW_REPEAT)
-	switch (key) {
-	case GLFW_KEY_ENTER:
-	    buffer.insertLine();
-	case -1: // UNKOWN_KEY
-	    break;
-	case 'D':
-	    if (mods & GLFW_MOD_ALT) {
-		buffer.backspace();
+    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+	if (mode == INSERT_MODE)
+	    switch (key) {
+	    case GLFW_KEY_ENTER:
+		buffer.insert_line(cursor);
 		break;
-	    }
-	case 'Q':
-	    if (mods & GLFW_MOD_ALT) {
+	    default:
+		if (key < 97) {
+		    if (key == GLFW_KEY_SPACE && (mods && GLFW_MOD_ALT)) {
+			mode = COMMAND_MODE;
+			break;
+		    }
+		    if (mods & GLFW_MOD_SHIFT) {
+			buffer.insert(cursor, key);
+		    } else {
+			buffer.insert(cursor, tolower(key));
+		    }
+		    break;
+		}
+	    } else if (mode == COMMAND_MODE) {
+	    switch(key) {
+	    case GLFW_KEY_ENTER:
+		buffer.insert_line(cursor);
+		break;
+	    case 'D':
+		buffer.backspace(cursor);
+		break;
+	    case 'F':
+		mode = INSERT_MODE;
+		break; 
+	    case 'Q':
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
 		break;
 	    }
-	default:
-	    if (key < 97) {
-		if (mods & GLFW_MOD_SHIFT)
-		    buffer.insert(key);
-		else
-		    buffer.insert(tolower(key));
-	    }
 	}
+    }
 }
 
 int main()
@@ -73,7 +99,8 @@ int main()
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    // glBlendFunc(GL_ONE, GL_ZERO);
+    
     textRenderer.Init(WIDTH, HEIGHT);
     textRenderer.Load("Inconsolata-Regular.ttf", font_size);
     
@@ -87,8 +114,7 @@ int main()
 	// Check and call events
 	glfwWaitEvents();
 	// text rendering
-	//PieceTable::NextWritable next_writable = PieceTable::NextWritable(buffer.lines.cbegin());
-	textRenderer.RenderText(buffer.lines.begin(),
+	textRenderer.render_buffer(buffer.lines.begin(),
 				buffer.lines.end(),
 				0.0f,
 				0.0f,
