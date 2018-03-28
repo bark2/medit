@@ -46,12 +46,13 @@ void TextRenderer::Init(GLuint width, GLuint height)
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    
 }
 
 void TextRenderer::Load(std::string font, GLuint fontSize)
 {
     cfontSize = fontSize;
+    min_adv_x = 1;
+    adv_y = fontSize;
     // First clear the previously loaded Characters
     this->Characters.clear();
     // Then initialize and load the FreeType library
@@ -103,6 +104,15 @@ void TextRenderer::Load(std::string font, GLuint fontSize)
 	    face->glyph->advance.x
 	};
 	Characters.insert(std::pair<GLchar, Character>(c, character));
+	// if (face->glyph->bitmap_left < min_adv_x) {
+	    // std::cout << face->glyph->bitmap_left << '\n';
+	    // min_adv_x = face->glyph->bitmap_left;
+	// }
+	// if (face->glyph->advance.y > adv_y) {
+	    // assert(0);
+	    // std::cout << face->glyph->advance.y << '\n';
+	    // adv_y = face->glyph->advance.y;
+	// }
     }
     glBindTexture(GL_TEXTURE_2D, 0);
     // Destroy FreeType once we're finished
@@ -151,11 +161,11 @@ void TextRenderer::RenderChar(unsigned char u8, GLfloat x, GLfloat y, GLfloat sc
 }
 
 void TextRenderer::render_buffer(std::list<Line>::iterator start_line,
-		  std::list<Line>::iterator end_line,
-		  GLfloat x,
-		  GLfloat y,
-		  GLfloat scale,
-		  glm::vec3 color)
+				 std::list<Line>::iterator end_line,
+				 std::list<Line>::iterator cline,
+				 uint32_t ccursor,
+				 GLfloat scale,
+				 glm::vec3 color)
 {
     // Activate corresponding render state	
     this->TextShader.Use();
@@ -163,55 +173,55 @@ void TextRenderer::render_buffer(std::list<Line>::iterator start_line,
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(this->VAO);
     GLfloat glyph_size;
-    int row = 0;
-    for (auto cl = start_line; cl != end_line; cl++, row++) {
-	if (!cl->nchars)
-	    continue;
-	int col = 0;
-	bool more_to_print = true;
-	for (uint32_t i = cl->start_offset(); more_to_print; more_to_print = cl->next_from_offset(i, i), col++) {
-	    Character ch = Characters[cl->line[i]];
-	    
-	    GLfloat xpos = x + ch.Bearing.x * scale;
-	    GLfloat ypos = y + (this->Characters['H'].Bearing.y - ch.Bearing.y) * scale;
-
-	    GLfloat w = ch.Size.x * scale;
-	    GLfloat h = ch.Size.y * scale;
-	    // Update VBO for each character
-	    GLfloat vertices[6][4] = {
-		{ xpos,     ypos + h,   0.0, 1.0 },
-		{ xpos + w, ypos,       1.0, 0.0 },
-		{ xpos,     ypos,       0.0, 0.0 },
-
-		{ xpos,     ypos + h,   0.0, 1.0 },
-		{ xpos + w, ypos + h,   1.0, 1.0 },
-		{ xpos + w, ypos,       1.0, 0.0 }
-	    };
-	    // Render glyph texture over quad
-	    glBindTexture(GL_TEXTURE_2D, ch.TextureID);
-	    // Update content of VBO memory
-	    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
-	    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
-
-	    glBindBuffer(GL_ARRAY_BUFFER, 0);
-	    // Render quad
-	    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-	    // Cursor Rendering
-	    std::cout << "cursor.x: " << cursor.x << " cursor.y: " << cursor.y <<
-		" col: " << col << " row: " << row << '\n';
-	    if (cursor.x-1 == col && cursor.y == row) {
-		// assert(0);
-		GLfloat cursor_vertices[6][2] = {
-		    {xpos + cfontSize, ypos + cfontSize},
-		    {xpos + cfontSize, ypos + (4*cfontSize)/5},
-		    {xpos + cfontSize + cfontSize, ypos + cfontSize},
+    int x = 0;
+    int y = 0;
+    for (auto cl = start_line; cl != end_line; cl++) {
+	if (cl->nchars) {
+	    uint32_t i = cl->start_offset();
+	    do {
+		Character ch = Characters[cl->line[i]];
 		
-		    {xpos + cfontSize, ypos + cfontSize},
-		    {xpos + cfontSize + cfontSize, ypos + (4*cfontSize)/5},
-		    {xpos + cfontSize + cfontSize, ypos + cfontSize}
+		GLfloat xpos = x + ch.Bearing.x * scale;
+		GLfloat ypos = y + (this->Characters['H'].Bearing.y - ch.Bearing.y) * scale;
+
+		GLfloat w = ch.Size.x * scale;
+		GLfloat h = ch.Size.y * scale;
+		// Update VBO for each character
+		GLfloat vertices[6][4] = {
+		    { xpos,     ypos + h,   0.0, 1.0 },
+		    { xpos + w, ypos,       1.0, 0.0 },
+		    { xpos,     ypos,       0.0, 0.0 },
+
+		    { xpos,     ypos + h,   0.0, 1.0 },
+		    { xpos + w, ypos + h,   1.0, 1.0 },
+		    { xpos + w, ypos,       1.0, 0.0 }
 		};
-		// GLfloat cursor_vertices[6][2] = {
+		// Render glyph texture over quad
+		glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+		// Update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		// Render quad
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	    
+		// Cursor Rendering
+		// update to match the scale ..  
+		if (cl == cline && i+1 == ccursor) {
+		    // assert(0);
+		    // mb render 'ascii 219' with proper glBlendingFunc
+		    GLfloat cursor_x = xpos + (ch.Advance >> 6) * scale;
+		    GLfloat cursor_vertices[6][2] = {
+			{cursor_x, ypos},
+			{cursor_x + min_adv_x, ypos},
+			{cursor_x, ypos + adv_y},
+		
+			{cursor_x + min_adv_x, ypos},
+			{cursor_x, ypos + adv_y},
+			{cursor_x + min_adv_x, ypos + adv_y}
+		    };
+		    // GLfloat cursor_vertices[6][2] = {
 		    // {200, 200},
 		    // {200, 400},
 		    // {400, 400},
@@ -219,22 +229,25 @@ void TextRenderer::render_buffer(std::list<Line>::iterator start_line,
 		    // {0, 0},
 		    // {0, 0},
 		    // {0, 0}
-		// };
+		    // };
 		
-		cursor_shader.Use();
-		glBindVertexArray(cursor_vao);
-		glBindBuffer(GL_ARRAY_BUFFER, cursor_vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cursor_vertices), cursor_vertices);
-		// glBufferData(GL_ARRAY_BUFFER, sizeof(cursor_vertices), cursor_vertices, GL_DYNAMIC_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		    cursor_shader.Use();
+		    glBindVertexArray(cursor_vao);
+		    glBindBuffer(GL_ARRAY_BUFFER, cursor_vbo);
+		    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cursor_vertices), cursor_vertices);
+		    glBindBuffer(GL_ARRAY_BUFFER, 0);
+		    glDrawArrays(GL_TRIANGLES, 0, 6);
 		
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindVertexArray(this->VAO);
-		
-	    }
-	    // Now advance cursors for next glyph
-	    x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (1/64th times 2^6 = 64)
+		    glBindBuffer(GL_ARRAY_BUFFER, 0);
+		    this->TextShader.Use();
+		    this->TextShader.SetVector3f("textColor", color);
+		    glActiveTexture(GL_TEXTURE0);
+		    glBindVertexArray(this->VAO);
+    		
+		} 
+		// Now advance cursors for next glyph
+		x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (1/64th times 2^6 = 64)
+	    } while(cl->next_from_offset(i, i));
 	}
 	x = 0;
 	y += cfontSize;

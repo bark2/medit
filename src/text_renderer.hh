@@ -19,7 +19,7 @@
 
 //#include "texture.h"
 #include "shader.hh"
-#include "gap_buffer.hh"
+#include "buffer.hh"
 #include "types.hh"
 
 /// Holds all state information relevant to a character as loaded using FreeType
@@ -37,7 +37,9 @@ struct Character {
 class TextRenderer
 {
 public:
-    int cfontSize;
+    GLfloat cfontSize;
+    GLfloat min_adv_x;
+    GLfloat adv_y;
     // Holds a list of pre-compiled Characters
     std::map<GLchar, Character> Characters;
     // Shader used for text rendering
@@ -53,11 +55,11 @@ public:
     void RenderChar(unsigned char u8, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 
     void render_buffer(std::list<Line>::iterator start_row,
-		      std::list<Line>::iterator end_row,
-		      GLfloat x,
-		      GLfloat y,
-		      GLfloat scale,
-		      glm::vec3 color);
+		       std::list<Line>::iterator end_row,
+		       std::list<Line>::iterator cline,
+		       uint32_t ccursor,
+		       GLfloat scale,
+		       glm::vec3 color);
 private:
     // Render state
     GLuint VAO, VBO;
