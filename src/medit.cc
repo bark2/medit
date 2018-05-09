@@ -45,7 +45,16 @@ void key_callback(uint32_t key) {
 		buffer.emplace_line();
 		break;
 	    case 'd':
-		buffer.erase_char();
+		buffer.cursor_back_erase();
+		break;
+	    case '5':
+		buffer.cursor_forward_erase();
+		break;
+	    case 'e':
+		buffer.back_erase_word(buffer.ccursor());
+		break;
+	    case 'r':
+		buffer.forward_erase_word(buffer.ccursor());
 		break;
 	    case 'l':
 		buffer.cursor_next();
@@ -59,12 +68,19 @@ void key_callback(uint32_t key) {
 	    case 'k':
 		buffer.cursor_down();
 		break;
+	    case 'o':
+		buffer.cursor_next_end_word();
+		break;
+	    case 'u':
+		buffer.cursor_prev_start_word();
+		break;	
 	    case 'f':
 		mode = INSERT_MODE;
 		break; 
 	    case 'q':
 		end_window = true;
 		break;
+	    
 	    }
 	}
     }

@@ -2,10 +2,12 @@
 #define BUFFER_H
 
 #include "line.hh"
+#include <assert.h>
+typedef std::list<Line>::iterator  LineIterator;
+typedef std::list<Line>::const_iterator  const_LineIterator;
 
 struct Buffer
 {
-
     std::list<Line> lines;
     std::list<Line>::iterator cline;
 
@@ -23,13 +25,32 @@ struct Buffer
     };
     void emplace_char(char c);
     void emplace_line();
-    void erase_char();
+
     uint32_t ccursor() const;
-    void cursor_next();
-    void cursor_prev();
+    bool next(LineIterator& li, uint32_t& offset);
+    bool prev(LineIterator& li, uint32_t& offset);
+    bool cursor_next();
+    bool cursor_prev();
+    void next_end_word(LineIterator& li, uint32_t& offset);
+    void next_start_word(LineIterator& li, uint32_t& offset);
+    void prev_end_word(LineIterator& li, uint32_t& offset);
+    void prev_start_word(LineIterator& li, uint32_t& offset);
+    void cursor_prev_start_word();
+    void cursor_next_end_word();
     void cursor_up();
     void cursor_down();
-    void move_cursor(uint32_t offset);
+    
+    void cursor_back_erase();
+    void cursor_forward_erase();
+    bool back_erase(LineIterator& li, uint32_t& offset);
+    bool forward_erase(LineIterator& li, uint32_t& offset);
+    void back_erase_word(uint32_t offset);
+    void forward_erase_word(uint32_t offset);
+    // bool back_erase_word(LineIterator& li, uint32_t& offset);
+    // bool forward_erase_word(LineIterator& li, uint32_t& offset);
+
+    void move_next_word(LineIterator& li, uint32_t& offset);
+    void move_prev_word(LineIterator& li, uint32_t& offset);
 };
 
 #endif

@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 #include <list>
+#include <ostream>
 #include <queue>
 #include "types.hh"
 
@@ -35,22 +36,28 @@ struct Line {
 
     Line(uint32_t bufSize=defaultBufSize, uint32_t gapSize=defaultGapSize);
     Line(Line&& other);
+    friend std::ostream& operator<<(std::ostream& os, Line& l);
     ~Line() = default;
     void push_char(char c);
     void emplace_char(char c, uint32_t offset);
     bool pop_char();
-    bool erase_char(uint32_t offset);
+    
+    bool backspace(uint32_t offset);
+    uint32_t erase_word(uint32_t offset);
+
     void push_string(const char* s, size_t size);    
     void push_string(std::string s);
     void emplace_string(uint32_t offset, const char* s, size_t size);
-    bool start_offset(uint32_t& offset) const;
+    uint32_t start_offset() const;
     bool next_from_offset(uint32_t offset, uint32_t& next) const;
     bool prev_from_offset(uint32_t offset, uint32_t& prev);
-    bool move_cursor_by_offset(int32_t offset);
+    bool move_by_offset(uint32_t pos, int32_t offset, uint32_t& new_offset);
+    uint32_t operator[](size_t offset) const;
     bool get_at_pos(uint32_t pos, uint32_t& res) const;
     // void move_cursor_to_dest(uint32_t dest);
     bool cursor_next();
     bool cursor_prev();
+    
 
     friend uint32_t mark(const Line& l, uint32_t offset, size_t n);
     friend std::string copy(const Line& l, uint32_t offset, size_t n);
@@ -58,6 +65,17 @@ struct Line {
     friend std::string cut(Line& l, uint32_t offset, size_t n);
     void yank(uint32_t offset, std::list<std::string> sl);
     void yank(uint32_t offset, std::string s);
+    bool move_next_word(uint32_t& offset);
+    bool move_prev_word(uint32_t& offset);
+    bool cursor_next_word();
+    bool cursor_prev_word();
+
+    bool next(uint32_t& offset);
+    bool prev(uint32_t& offset);
+    bool next_end_word(uint32_t& offset);
+    bool next_start_word(uint32_t& offset);
+    bool prev_end_word(uint32_t& offset);
+    bool prev_start_word(uint32_t& offset);
 };
 
 #endif

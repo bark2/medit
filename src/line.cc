@@ -11,15 +11,26 @@ Line::Line(Line&& other) :
     styles = std::move(other.styles);
 }
 
+std::ostream& operator<<(std::ostream& os, Line& l)
+{
+    for (uint32_t i = 0; i < l.size; i++) {
+	if (i == l.gap_offset) {
+	    os << " gap_size{" << l.gap_size << "} ";
+	    i += l.gap_size;
+	} 
+	os << l.line[i];
+    }
+    return os;
+}
+
 void Line::move_gap_to_dest(uint32_t dest) {
     int32_t delta = dest - gap_offset;
     if (delta < 0) {
 	std::memcpy(line.get() + dest + gap_size, line.get() + dest, -1 * delta);
-	gap_offset += delta;
     } else if (delta > 0) {
 	std::memcpy(line.get() + gap_offset, line.get() + gap_offset + gap_size, delta);
-	gap_offset += delta;
     }
+    gap_offset = dest;
 }
 
 void Line::expand() {
@@ -68,26 +79,46 @@ uint32_t Line::start_offset() const
     return (gap_offset)? 0 : gap_offset;
 }
 
+bool Line::next(uint32_t& offset)
+{
+    if (offset == nchars)
+	return false;
+    offset++;
+    return true;
+}
+
 bool Line::cursor_next()
 {
-    return next_from_offset(cursor, cursor);
+    return next(cursor);
+}
+
+bool Line::prev(uint32_t& offset)
+{
+    if (!offset)
+	return false;
+    offset--;
+    return true;
 }
 
 bool Line::cursor_prev()
 {
-    return prev_from_offset(cursor, cursor);
+    return prev(cursor);
 }
 
-bool Line::move_cursor_by_offset(int32_t offset)
+bool Line::move_by_offset(uint32_t pos, int32_t offset, uint32_t& new_offset)
 {
-    bool delta = (offset > 0)? true : false;
-    offset = (offset > 0)? offset : -1 * offset;
-    bool res;
-    for (int i = 0; i < offset; i++)
-	res = (delta)?
-	    cursor_next():
-	    cursor_prev();
-    return res;
+    if (pos + offset > gap_offset)
+	offset += gap_size;
+    if (pos + offset > size || pos + offset < 0)
+	return false;
+    new_offset = pos + offset;
+    return true;
+}
+
+uint32_t Line::operator[](size_t offset) const
+{
+    assert(offset < nchars && offset >= 0);
+    return line[(offset < gap_offset)? offset : offset + gap_size];
 }
 
 bool Line::get_at_pos(uint32_t pos, uint32_t& res) const
@@ -106,7 +137,8 @@ void Line::emplace_char(char c, uint32_t offset) {
     nchars++;
 }
 
-bool Line::erase_char(uint32_t offset) {
+// erases the char stands before offset
+bool Line::backspace(uint32_t offset) {
     // if (gap_size == (size+1)/2)
     // 	shrink();
     if (!offset)
@@ -118,11 +150,6 @@ bool Line::erase_char(uint32_t offset) {
     line[gap_offset] = '\0';
     nchars--;
     return true;
-}
-
-bool Line::pop_char()
-{
-    return erase_char(nchars);
 }
 
 void Line::emplace_string(uint32_t offset, const char* s, size_t size)
@@ -164,7 +191,7 @@ std::string cut(Line& l, uint32_t offset, size_t n)
     l.move_gap_to_dest(offset+n);
     std::string res(&l.line[offset], n);
     while(n) {
-	l.erase_char(offset+n--);
+	l.backspace(offset+n--);
     }
     return res;
 }
@@ -180,4 +207,112 @@ void Line::yank(uint32_t offset ,std::list<std::string> sl)
 	emplace_string(offset, s.c_str(), s.length());
 	offset += s.length();
     }
+}
+
+bool inword(char c)
+{
+    switch(c) {
+    case ' ':
+    case '(':
+    case ')':
+    case ',':
+    case '.':
+    case ':':
+    case ';':
+	return false;
+    }
+    return true;
+}
+
+
+// offset should not be inside the word
+bool Line::next_end_word(uint32_t& offset)
+{
+    while (next(offset) && offset < nchars && !inword((*this)[offset]))
+	   ;
+    bool tmp;
+    while ((tmp = next(offset)) && offset < nchars && inword((*this)[offset]))
+	;
+    return tmp;
+}
+
+bool Line::next_start_word(uint32_t& offset)
+{
+    next_end_word(offset);
+    bool tmp;
+    while ((tmp = next(offset)) && offset < nchars && !inword((*this)[offset]))
+	   ;
+    return tmp;
+}
+
+bool Line::prev_start_word(uint32_t& offset)
+{
+    while(prev(offset) && !inword((*this)[offset]))
+	;
+    bool tmp;
+    while((tmp = prev(offset)) && inword((*this)[offset]))
+	;
+    if (tmp)
+	offset++;
+    return tmp;
+}
+
+bool Line::prev_end_word(uint32_t& offset)
+{
+    if (!prev_start_word(offset))
+	return false;
+    next_end_word(offset);
+    return true;
+}
+
+bool Line::move_next_word(uint32_t& offset)
+{
+    if (offset == nchars)
+	return false;
+
+    while (offset < nchars && !inword((*this)[offset]))
+	offset++;
+    if (offset == nchars)
+	return false;
+    
+    while (offset < nchars && inword((*this)[offset]))
+	offset++;
+
+    return true;
+}
+
+bool Line::cursor_next_word()
+{
+    return move_next_word(cursor);
+}
+
+bool Line::move_prev_word(uint32_t& offset)
+{
+    if (!offset)
+	return false;
+
+    while (offset && !inword((*this)[offset-1]))
+	offset--;
+    if (!offset)
+	return false;
+    
+    while (offset && inword((*this)[offset-1]))
+	offset--;
+    
+    return true;
+}
+
+bool Line::cursor_prev_word()
+{
+    return move_prev_word(cursor);
+}
+
+// should be changing the function using internal cursor for the use of threading?
+uint32_t Line::erase_word(uint32_t offset)
+{
+    uint32_t new_offset = move_prev_word(offset);
+    while (offset != new_offset)
+	backspace(offset--);
+    
+    return new_offset;
 }

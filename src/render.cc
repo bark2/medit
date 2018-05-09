@@ -1,4 +1,5 @@
 #include "line.hh"
+#include "buffer.hh"
 #include "render.hh"
 
 bool Render::init()
@@ -27,14 +28,14 @@ void Render::redraw_buffer(const Buffer& buffer)
     
     uint32_t row = 0;
     move(0, 0);
-    for (std::list<Line>::const_iterator it = buffer.lines.begin(); it != buffer.lines.end(); it++) {
+    for (const_LineIterator it = buffer.lines.begin(); it != buffer.lines.end(); it++) {
 	uint32_t i;
-	for (i = 0; it->get_at_pos(i, c); i++) {
-		addch(c);
-		if (it == buffer.cline && i == buffer.cline->cursor) {
-		    crow = row;
-		    ccol = i;
-		}
+	for (i = 0; i < it->nchars; i++) {
+	    addch((*it)[i]);
+	    if (it == buffer.cline && i == buffer.cline->cursor) {
+		crow = row;
+		ccol = i;
+	    }
 	}
 	if (it == buffer.cline && i == buffer.cline->cursor) {
 	    crow = row;
